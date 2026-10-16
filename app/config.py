@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # --- Server / deploy ---
     run_db_init: bool = True        # bootstrap schema on startup; set false on serverless
 
+    # --- Admin ---
+    # When set, destructive endpoints (DELETE /documents/{id}) require a matching
+    # X-API-Key header. Empty means open, which is convenient for local development.
+    admin_api_key: str = ""
+
     # --- Rate limiting (protects the public demo) ---
     rate_limit_enabled: bool = True
     rate_limit_per_minute: int = 10  # per-IP requests/minute to /query and /documents

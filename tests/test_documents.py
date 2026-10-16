@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
 from app.database import get_db
 from app.main import app
 
@@ -55,3 +56,27 @@ def test_delete_missing_document_returns_404():
     assert response.status_code == 404
     assert session.deleted is None
     assert session.committed is False
+
+
+@pytest.fixture(autouse=True)
+def _open_by_default(monkeypatch):
+    # Don't let a developer's local .env change these tests.
+    monkeypatch.setattr(get_settings(), "admin_api_key", "")
+
+
+def test_delete_rejected_without_valid_key_when_configured(monkeypatch):
+    monkeypatch.setattr(get_settings(), "admin_api_key", "s3cret")
+    session = FakeSession(SimpleNamespace(id=7))
+    client = _client(session)
+    assert client.delete("/documents/7").status_code == 401
+    assert client.delete("/documents/7", headers={"X-API-Key": "wrong"}).status_code == 401
+    assert client.delete("/documents/7", headers={"X-API-Key": "é".encode()}).status_code == 401
+    assert session.deleted is None
+
+
+def test_delete_succeeds_with_correct_key(monkeypatch):
+    monkeypatch.setattr(get_settings(), "admin_api_key", "s3cret")
+    session = FakeSession(SimpleNamespace(id=7))
+    response = _client(session).delete("/documents/7", headers={"X-API-Key": "s3cret"})
+    assert response.status_code == 204
+    assert session.deleted is not None

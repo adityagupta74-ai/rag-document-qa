@@ -176,6 +176,7 @@ dynamic, public demo at zero cost.
    | `EMBEDDING_DIM` | `768` |
    | `DATABASE_URL` | your Neon connection string |
    | `RUN_DB_INIT` | `false` — schema is already provisioned |
+   | `ADMIN_API_KEY` | a long random string — required as `X-API-Key` to delete documents |
 
 3. Deploy → live at `https://<project>.vercel.app`.
 
@@ -283,6 +284,14 @@ curl -N -X POST http://localhost:8000/query/stream \
   -H "Content-Type: application/json" \
   -d '{ "question": "How long do I have to get a refund?" }'
 ```
+
+### Delete a document
+```bash
+curl -X DELETE http://localhost:8000/documents/1 \
+  -H "X-API-Key: $ADMIN_API_KEY"
+```
+Returns `204` (or `404` if the id doesn't exist). If `ADMIN_API_KEY` is unset the endpoint is
+open, which is convenient locally — **set it on any public deployment**.
 
 ---
 

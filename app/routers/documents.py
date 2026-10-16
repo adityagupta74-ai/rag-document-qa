@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Chunk, Document
 from app.schemas import DocumentSummary, IngestRequest, IngestResponse
+from app.security import require_admin_key
 from app.services.extract import extract_text
 from app.services.ingestion import ingest_document
 
@@ -62,7 +63,7 @@ async def upload_document(
     return _to_response(document)
 
 
-@router.delete("/{document_id}", status_code=204)
+@router.delete("/{document_id}", status_code=204, dependencies=[Depends(require_admin_key)])
 def delete_document(document_id: int, db: Session = Depends(get_db)):
     """Delete a document and all of its chunks."""
     document = db.get(Document, document_id)
