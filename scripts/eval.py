@@ -22,13 +22,17 @@ The bundled example documents are ingested automatically if the store is empty.
 """
 from __future__ import annotations
 
+import os
+import time
 from dataclasses import dataclass
+from functools import lru_cache
 
 from sqlalchemy import func, select
 
 from app.config import get_settings
 from app.database import SessionLocal, init_db
 from app.models import Document
+from app.services import retrieval
 from app.services.ingestion import ingest_document
 from app.services.search import search
 from scripts.ingest_examples import EXAMPLES, SUPPORTED, read_file
@@ -62,9 +66,46 @@ CASES: list[Case] = [
     Case("What command installs the local toolchain?", "make bootstrap"),
     Case("What is the free-plan API request limit per minute?", "60 requests per minute"),
     Case("How many days do customers have for a no-questions-asked refund?", "within 30 days"),
+    # Paraphrased questions: little word overlap with the answer, so they need real
+    # semantic matching and are harder than the ones above.
+    Case(
+        "Can I still get money back if I ask after the first month?",
+        "store credit only",
+    ),
+    Case(
+        "Who steps in when coworkers cannot resolve a dispute?",
+        "available to mediate",
+    ),
+    Case(
+        "From what spend amount must I keep a receipt?",
+        "over $25",
+    ),
+    Case(
+        "How fast do enterprises get a reply to a critical outage?",
+        "first response within one hour",
+    ),
+    Case(
+        "Do students have to pay for the Pro plan?",
+        "free Pro access",
+    ),
+    Case(
+        "How long does the service keep retrying a failed webhook?",
+        "retried for up to 24 hours",
+    ),
+    Case(
+        "Can I move a project from the US to the EU region later?",
+        "cannot be changed after creation",
+    ),
+    Case(
+        "Which TLS versions protect data in transit?",
+        "TLS 1.2+",
+    ),
 ]
 
-TOP_K = 5
+TOP_K = int(os.environ.get("EVAL_TOP_K", "5"))
+# Seconds to wait after each re-ranked query, so free-tier LLM quotas
+# (e.g. 5 requests/minute) don't reject the re-rank call.
+EVAL_DELAY = float(os.environ.get("EVAL_DELAY", "0"))
 
 
 def _ensure_examples(db) -> None:
@@ -81,6 +122,8 @@ def _ensure_examples(db) -> None:
 def _answer_rank(db, case: Case, k: int) -> int:
     """1-based rank of the first retrieved chunk that contains the answer, or 0."""
     result = search(db, case.question, top_k=k)
+    if get_settings().use_rerank and EVAL_DELAY:
+        time.sleep(EVAL_DELAY)
     needle = case.answer.lower()
     for rank, chunk in enumerate(result.chunks, start=1):
         if needle in chunk.content.lower():
@@ -107,6 +150,8 @@ def _evaluate(db, label: str, k: int) -> tuple[float, float]:
 
 def main() -> None:
     init_db()
+    # Each question is embedded once per pipeline variant; cache to save API calls.
+    retrieval.embed_query = lru_cache(maxsize=None)(retrieval.embed_query)
     db = SessionLocal()
     try:
         _ensure_examples(db)
@@ -117,6 +162,11 @@ def main() -> None:
         settings.use_rerank = False
         base = _evaluate(db, "Vector-only baseline", TOP_K)
 
+        # Hybrid retrieval (vector + keyword via RRF), no re-ranking: isolates keyword search.
+        settings.use_hybrid = True
+        settings.use_rerank = False
+        hybrid = _evaluate(db, "Hybrid (no re-rank)", TOP_K)
+
         # Full pipeline: hybrid retrieval (vector + keyword via RRF) + LLM re-rank.
         settings.use_hybrid = True
         settings.use_rerank = True
@@ -124,6 +174,7 @@ def main() -> None:
 
         print("\nSummary")
         print(f"  vector-only        hit-rate {base[0]:.2f}   MRR {base[1]:.3f}")
+        print(f"  hybrid (no rerank) hit-rate {hybrid[0]:.2f}   MRR {hybrid[1]:.3f}")
         print(f"  hybrid + re-rank   hit-rate {full[0]:.2f}   MRR {full[1]:.3f}")
     finally:
         db.close()
