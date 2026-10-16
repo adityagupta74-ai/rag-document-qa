@@ -380,9 +380,9 @@ Dhairya Senjaliya. My changes on top of it:
 - **Reranker input fix** — passages were truncated to 600 characters, hiding answers deeper in 800-token chunks and making the judge score everything 0. It now sees up to 4,000 characters.
 - **Keyword search fix** — full-text search required every word of the question to match, so natural-language questions returned nothing and "hybrid" retrieval was effectively vector-only. Query terms are now OR-ed.
 - **Heading-aware Markdown chunking** — chunks start at section boundaries; oversized sections are split with their heading repeated on each piece.
-- **`DELETE /documents/{id}`** endpoint with offline tests.
-- **Evaluation harness** — added paraphrased questions, a hybrid-without-rerank variant, an embedding cache and throttling for free-tier rate limits.
-- **Tests** — 15 new offline tests (29 total), all run in CI.
+- **`DELETE /documents/{id}`** endpoint with optional `X-API-Key` protection and offline tests.
+- **Evaluation harness** — added paraphrased questions, a hybrid-without-rerank variant, an embedding cache, throttling for free-tier rate limits, and a guard that refuses to report re-ranking results if the re-ranker fell back to retrieval order.
+- **Tests** — 18 new offline tests (32 total), all run in CI.
 
 ### Evaluation
 
