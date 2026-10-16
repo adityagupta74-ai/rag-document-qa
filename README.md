@@ -172,7 +172,7 @@ dynamic, public demo at zero cost.
    | `OPENAI_API_KEY` | your Gemini (or OpenAI) key |
    | `OPENAI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai/` |
    | `OPENAI_EMBEDDING_MODEL` | `gemini-embedding-001` |
-   | `OPENAI_CHAT_MODEL` | `gemini-3.8-flash` |
+   | `OPENAI_CHAT_MODEL` | `gemini-3.5-flash-lite` |
    | `EMBEDDING_DIM` | `768` |
    | `DATABASE_URL` | your Neon connection string |
    | `RUN_DB_INIT` | `false` — schema is already provisioned |
@@ -198,7 +198,7 @@ run it on a paid OpenAI key — or **for free**:
 | Provider | Cost | Key `.env` settings |
 |----------|------|---------------------|
 | **OpenAI** | paid | `OPENAI_EMBEDDING_MODEL=text-embedding-3-small` · `EMBEDDING_DIM=1536` |
-| **Google Gemini** | **free tier** | `OPENAI_BASE_URL=…/v1beta/openai/` · `OPENAI_EMBEDDING_MODEL=gemini-embedding-001` · `OPENAI_CHAT_MODEL=gemini-3.8-flash` · `EMBEDDING_DIM=768` |
+| **Google Gemini** | **free tier** | `OPENAI_BASE_URL=…/v1beta/openai/` · `OPENAI_EMBEDDING_MODEL=gemini-embedding-001` · `OPENAI_CHAT_MODEL=gemini-3.5-flash-lite` · `EMBEDDING_DIM=768` |
 | **Ollama** | **free, local** | `OPENAI_BASE_URL=http://localhost:11434/v1` · `nomic-embed-text` / `llama3.2` · `EMBEDDING_DIM=768` |
 
 Copy-paste blocks for each are in [`.env.example`](.env.example). Embedding
@@ -392,15 +392,16 @@ Dhairya Senjaliya. My changes on top of it:
 |---|---|---|
 | Vector-only | 0.96 (23/24) | 0.896 |
 | Hybrid (vector + keyword, RRF) | 1.00 (24/24) | 0.951 |
+| Hybrid + LLM re-ranking | 1.00 (24/24) | 1.000 |
 
-This is a small, synthetic test set, so treat the numbers as a regression check rather than a benchmark. LLM re-ranking has not been measured yet (the free-tier quota ran out during the run).
+Re-ranking used `gemini-3.5-flash-lite` as the judge and costs one extra LLM call per query. This is a small, synthetic test set and the pipeline now scores perfectly on it, so treat the numbers as a regression check rather than a benchmark; a larger, harder set would be needed to separate further improvements. The evaluation refuses to report a re-ranking result if the re-ranker fell back to retrieval order on any question.
 
 Reproduce:
 
 ```bash
 docker compose exec db createdb -U rag rag_eval
 DATABASE_URL=postgresql+psycopg://rag:rag@localhost:5432/rag_eval \
-CHUNK_SIZE=120 CHUNK_OVERLAP=20 EVAL_TOP_K=3 python -m scripts.eval
+CHUNK_SIZE=120 CHUNK_OVERLAP=20 EVAL_TOP_K=3 EVAL_DELAY=5 python -m scripts.eval
 ```
 
 ---
