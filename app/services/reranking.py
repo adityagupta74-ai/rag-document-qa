@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 
 SYSTEM = "You are a precise search-relevance judge. Respond with JSON only."
 
+# An 800-token chunk is ~3,500 characters; cutting passages shorter can hide the answer
+# from the judge, which then scores everything 0.
+PASSAGE_CHARS = 4000
+
 
 def _parse_scores(content: str, n: int) -> list[float] | None:
     """Parse a JSON array of n relevance scores (one per passage, in order).
@@ -58,7 +62,7 @@ def rerank(
         return []
 
     listing = "\n\n".join(
-        f'[{i}] (from "{c.document_title}") {c.content[:600]}'
+        f'[{i}] (from "{c.document_title}") {c.content[:PASSAGE_CHARS]}'
         for i, c in enumerate(candidates)
     )
     prompt = (
@@ -90,6 +94,8 @@ def rerank(
         scores = None
 
     # If re-ranking is unavailable, keep retrieval order and scores (never all-zero).
+    if scores and not any(s > 0 for s in scores):
+        logger.warning("Rerank scored every passage 0; using retrieval order")
     if not scores or not any(s > 0 for s in scores):
         return candidates[:top_k]
 
