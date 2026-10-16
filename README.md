@@ -1,6 +1,6 @@
-# 🔎 RAG Starter — FastAPI + pgvector + OpenAI
+# 🔎 RAG Document Q&A Service — FastAPI + pgvector
 
-![RAG Starter](.github/rag-cover.png)
+> Based on [rag-starter-fastapi](https://github.com/dhairyasenjaliya/rag-starter-fastapi) by Dhairya Senjaliya (MIT). See [What I changed](#what-i-changed).
 
 A small, **production-shaped** Retrieval-Augmented Generation (RAG) service.
 Ingest documents, embed and store them in **Postgres/pgvector**, then ask
@@ -9,7 +9,7 @@ questions and get **grounded, cited answers** — with streaming support.
 Built to be read: typed, layered, tested, and runnable in two commands.
 
 <p>
-  <a href="https://github.com/dhairyasenjaliya/rag-starter-fastapi/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/dhairyasenjaliya/rag-starter-fastapi/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/adityagupta74-ai/rag-document-qa/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/adityagupta74-ai/rag-document-qa/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white">
   <img alt="pgvector" src="https://img.shields.io/badge/pgvector-HNSW-4169E1?logo=postgresql&logoColor=white">
@@ -17,9 +17,6 @@ Built to be read: typed, layered, tested, and runnable in two commands.
   <img alt="License" src="https://img.shields.io/badge/License-MIT-green">
 </p>
 
-> ### 🔗 [**Try the live demo →**](https://rag-starter-fastapi-5rje.vercel.app)
-> Ask questions, get grounded answers with sources and re-rank scores.
->
 > 🆓 **Runs free:** works with OpenAI, or **Google Gemini's free tier** / local **Ollama** — see [Providers](#providers).
 
 ---
@@ -175,7 +172,7 @@ dynamic, public demo at zero cost.
    | `OPENAI_API_KEY` | your Gemini (or OpenAI) key |
    | `OPENAI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai/` |
    | `OPENAI_EMBEDDING_MODEL` | `gemini-embedding-001` |
-   | `OPENAI_CHAT_MODEL` | `gemini-2.5-flash` |
+   | `OPENAI_CHAT_MODEL` | `gemini-3.8-flash` |
    | `EMBEDDING_DIM` | `768` |
    | `DATABASE_URL` | your Neon connection string |
    | `RUN_DB_INIT` | `false` — schema is already provisioned |
@@ -200,7 +197,7 @@ run it on a paid OpenAI key — or **for free**:
 | Provider | Cost | Key `.env` settings |
 |----------|------|---------------------|
 | **OpenAI** | paid | `OPENAI_EMBEDDING_MODEL=text-embedding-3-small` · `EMBEDDING_DIM=1536` |
-| **Google Gemini** | **free tier** | `OPENAI_BASE_URL=…/v1beta/openai/` · `OPENAI_EMBEDDING_MODEL=gemini-embedding-001` · `OPENAI_CHAT_MODEL=gemini-2.5-flash` · `EMBEDDING_DIM=768` |
+| **Google Gemini** | **free tier** | `OPENAI_BASE_URL=…/v1beta/openai/` · `OPENAI_EMBEDDING_MODEL=gemini-embedding-001` · `OPENAI_CHAT_MODEL=gemini-3.8-flash` · `EMBEDDING_DIM=768` |
 | **Ollama** | **free, local** | `OPENAI_BASE_URL=http://localhost:11434/v1` · `nomic-embed-text` / `llama3.2` · `EMBEDDING_DIM=768` |
 
 Copy-paste blocks for each are in [`.env.example`](.env.example). Embedding
@@ -364,17 +361,45 @@ state of `main`.
 
 ---
 
+## What I changed
+
+This project started from the MIT-licensed
+[rag-starter-fastapi](https://github.com/dhairyasenjaliya/rag-starter-fastapi) by
+Dhairya Senjaliya. My changes on top of it:
+
+- **Reranker error handling** — failures were swallowed silently (a retired model name went unnoticed). Failures, unparseable replies and all-zero scores are now logged.
+- **Reranker input fix** — passages were truncated to 600 characters, hiding answers deeper in 800-token chunks and making the judge score everything 0. It now sees up to 4,000 characters.
+- **Keyword search fix** — full-text search required every word of the question to match, so natural-language questions returned nothing and "hybrid" retrieval was effectively vector-only. Query terms are now OR-ed.
+- **Heading-aware Markdown chunking** — chunks start at section boundaries; oversized sections are split with their heading repeated on each piece.
+- **`DELETE /documents/{id}`** endpoint with offline tests.
+- **Evaluation harness** — added paraphrased questions, a hybrid-without-rerank variant, an embedding cache and throttling for free-tier rate limits.
+- **Tests** — 15 new offline tests (29 total), all run in CI.
+
+### Evaluation
+
+24 labelled questions over the 3 sample documents (about 30 chunks at 120 tokens), top-3:
+
+| Pipeline | hit-rate@3 | MRR |
+|---|---|---|
+| Vector-only | 0.96 (23/24) | 0.896 |
+| Hybrid (vector + keyword, RRF) | 1.00 (24/24) | 0.951 |
+
+This is a small, synthetic test set, so treat the numbers as a regression check rather than a benchmark. LLM re-ranking has not been measured yet (the free-tier quota ran out during the run).
+
+Reproduce:
+
+```bash
+docker compose exec db createdb -U rag rag_eval
+DATABASE_URL=postgresql+psycopg://rag:rag@localhost:5432/rag_eval \
+CHUNK_SIZE=120 CHUNK_OVERLAP=20 EVAL_TOP_K=3 python -m scripts.eval
+```
+
+---
+
 ## About
 
-Built by **Dhairya Senjaliya** — Senior React Native & Full-Stack Engineer
-(mobile + web + AI). I build production apps and ship real AI features.
-
-- 🌐 Portfolio: https://dhairyasenjaliya.com/case-studies
-- 💼 Upwork: https://www.upwork.com/freelancers/~01f0a4715516af7e54
-- 🐙 GitHub: https://github.com/dhairyasenjaliya
-
-> Open to senior contracts in mobile, web, and AI-powered products.
+Maintained by **Aditya Gupta** — [GitHub](https://github.com/adityagupta74-ai).
 
 ## License
 
-MIT © 2026 Dhairya Senjaliya
+MIT — see [LICENSE](LICENSE). Original work © 2026 Dhairya Senjaliya; modifications © 2026 Aditya Gupta.
