@@ -59,7 +59,7 @@ ANN index.
 
 ## Retrieval pipeline
 
-![Hybrid retrieval pipeline](.github/rag-pipeline.png)
+![Retrieval pipeline](.github/rag-pipeline.svg)
 
 Naive RAG runs a single vector search and hopes for the best. This uses a
 two-stage pipeline that's far more robust:
