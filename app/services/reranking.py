@@ -8,10 +8,13 @@ same chat model as generation, so it works on OpenAI, Gemini, or Ollama.
 from __future__ import annotations
 
 import json
+import logging
 
 from app.config import get_settings
 from app.services.openai_client import get_client
 from app.services.retrieval import RetrievedChunk
+
+logger = logging.getLogger(__name__)
 
 SYSTEM = "You are a precise search-relevance judge. Respond with JSON only."
 
@@ -76,7 +79,14 @@ def rerank(
             temperature=0,
         )
         scores = _parse_scores(response.choices[0].message.content or "", len(candidates))
-    except Exception:
+        if scores is None:
+            logger.warning("Rerank response could not be parsed; using retrieval order")
+    except Exception as exc:
+        logger.warning(
+            "Rerank call failed (%s: %s); using retrieval order",
+            type(exc).__name__,
+            exc,
+        )
         scores = None
 
     # If re-ranking is unavailable, keep retrieval order and scores (never all-zero).
