@@ -6,6 +6,7 @@ combines both rankings without needing the two score scales to be comparable.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from sqlalchemy import select, text
@@ -48,8 +49,25 @@ def vector_search(db: Session, question: str, limit: int) -> list[RetrievedChunk
     ]
 
 
+_WORD = re.compile(r"\w+")
+
+
+def build_keyword_query(question: str) -> str:
+    """Turn a natural-language question into an OR-style full-text query.
+
+    ``websearch_to_tsquery`` ANDs every term, so a whole question almost never matches a
+    single chunk. OR-ing the words lets any of them match, and ``ts_rank`` then orders
+    chunks by how many (and how rare) of the terms they contain.
+    """
+    words = [w for w in _WORD.findall(question) if w.lower() != "or"]
+    return " or ".join(words)
+
+
 def keyword_search(db: Session, question: str, limit: int) -> list[RetrievedChunk]:
     """Lexical search via Postgres full-text search (ts_rank over a GIN index)."""
+    query = build_keyword_query(question)
+    if not query:
+        return []
     sql = text(
         """
         SELECT c.id AS chunk_id, c.document_id, c.chunk_index, c.content,
@@ -63,7 +81,7 @@ def keyword_search(db: Session, question: str, limit: int) -> list[RetrievedChun
         LIMIT :k
         """
     )
-    rows = db.execute(sql, {"q": question, "k": limit}).mappings().all()
+    rows = db.execute(sql, {"q": query, "k": limit}).mappings().all()
     return [
         RetrievedChunk(
             chunk_id=r["chunk_id"],
