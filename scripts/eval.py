@@ -32,7 +32,7 @@ from sqlalchemy import func, select
 from app.config import get_settings
 from app.database import SessionLocal, init_db
 from app.models import Document
-from app.services import retrieval
+from app.services import reranking, retrieval
 from app.services.ingestion import ingest_document
 from app.services.search import search
 from scripts.ingest_examples import EXAMPLES, SUPPORTED, read_file
@@ -170,11 +170,19 @@ def main() -> None:
         # Full pipeline: hybrid retrieval (vector + keyword via RRF) + LLM re-rank.
         settings.use_hybrid = True
         settings.use_rerank = True
+        reranking.stats["fallbacks"] = 0
         full = _evaluate(db, "Hybrid + re-ranking", TOP_K)
+        fallbacks = reranking.stats["fallbacks"]
 
         print("\nSummary")
         print(f"  vector-only        hit-rate {base[0]:.2f}   MRR {base[1]:.3f}")
         print(f"  hybrid (no rerank) hit-rate {hybrid[0]:.2f}   MRR {hybrid[1]:.3f}")
+        if fallbacks:
+            print(
+                "  hybrid + re-rank   NOT VALID: re-ranking fell back to retrieval order "
+                f"on {fallbacks}/{len(CASES)} questions"
+            )
+            raise SystemExit(1)
         print(f"  hybrid + re-rank   hit-rate {full[0]:.2f}   MRR {full[1]:.3f}")
     finally:
         db.close()

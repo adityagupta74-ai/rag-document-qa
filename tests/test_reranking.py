@@ -52,3 +52,14 @@ def test_all_zero_scores_fall_back_and_warn(monkeypatch, caplog):
         ranked = reranking.rerank("q", chunks, 2)
     assert [c.chunk_id for c in ranked] == [1, 2]
     assert "scored every passage 0" in caplog.text
+
+
+def test_fallbacks_are_counted(monkeypatch):
+    chunks = [_chunk(1, "a")]
+    before = reranking.stats["fallbacks"]
+    monkeypatch.setattr(reranking, "get_client", lambda: FakeClient("[0]"))
+    reranking.rerank("q", chunks, 1)
+    assert reranking.stats["fallbacks"] == before + 1
+    monkeypatch.setattr(reranking, "get_client", lambda: FakeClient("[7]"))
+    reranking.rerank("q", chunks, 1)
+    assert reranking.stats["fallbacks"] == before + 1

@@ -22,6 +22,10 @@ SYSTEM = "You are a precise search-relevance judge. Respond with JSON only."
 # from the judge, which then scores everything 0.
 PASSAGE_CHARS = 4000
 
+# Calls where re-ranking fell back to retrieval order. The evaluation script reads this
+# so it never reports numbers for a re-ranker that did not actually run.
+stats = {"fallbacks": 0}
+
 
 def _parse_scores(content: str, n: int) -> list[float] | None:
     """Parse a JSON array of n relevance scores (one per passage, in order).
@@ -97,6 +101,7 @@ def rerank(
     if scores and not any(s > 0 for s in scores):
         logger.warning("Rerank scored every passage 0; using retrieval order")
     if not scores or not any(s > 0 for s in scores):
+        stats["fallbacks"] += 1
         return candidates[:top_k]
 
     ranked = sorted(
