@@ -60,3 +60,13 @@ async def upload_document(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _to_response(document)
+
+
+@router.delete("/{document_id}", status_code=204)
+def delete_document(document_id: int, db: Session = Depends(get_db)):
+    """Delete a document and all of its chunks."""
+    document = db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    db.delete(document)
+    db.commit()
