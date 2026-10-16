@@ -1,0 +1,61 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:1280px; height:720px; }
+body { font-family:'Inter',system-ui,-apple-system,sans-serif; }
+.s { position:relative; width:1280px; height:720px; overflow:hidden; color:#e2e8f0;
+  background:
+    radial-gradient(800px 480px at 85% 8%, rgba(6,182,212,0.18), transparent 60%),
+    radial-gradient(760px 600px at 5% 100%, rgba(59,130,246,0.20), transparent 55%),
+    linear-gradient(160deg,#0b1120 0%,#0f172a 50%,#111c33 100%); }
+.grid { position:absolute; inset:0;
+  background-image:linear-gradient(rgba(148,163,184,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,0.05) 1px,transparent 1px);
+  background-size:44px 44px; mask-image:radial-gradient(circle at 50% 45%,#000 50%,transparent 90%); }
+.wrap { position:relative; z-index:2; padding:64px 64px; height:100%; display:flex; flex-direction:column; }
+.eyebrow { display:inline-flex; align-items:center; gap:11px; font-size:18px; font-weight:600; letter-spacing:2.5px;
+  text-transform:uppercase; color:#38bdf8; margin-bottom:14px; }
+.dot { width:11px; height:11px; border-radius:50%; background:#2dd4bf; box-shadow:0 0 13px #2dd4bf; }
+h1 { font-size:54px; font-weight:900; letter-spacing:-1.5px; margin-bottom:48px;
+  background:linear-gradient(100deg,#fff,#bae6fd 58%,#5eead4); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+.flow { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:1; padding-bottom:40px; }
+.node { padding:18px 16px; border-radius:16px; background:rgba(30,41,59,0.7); border:1px solid rgba(56,189,248,0.25);
+  text-align:center; min-width:150px; backdrop-filter:blur(4px); }
+.node .ic { font-size:30px; margin-bottom:8px; }
+.node .t { font-size:20px; font-weight:700; color:#e2e8f0; }
+.node .d { font-size:13.5px; color:#64748b; margin-top:4px; }
+.branch { display:flex; flex-direction:column; gap:16px; }
+.branch .node.v { border-color:rgba(59,130,246,0.5); background:rgba(30,58,138,0.22); }
+.branch .node.k { border-color:rgba(168,85,247,0.5); background:rgba(88,28,135,0.20); }
+.node.fuse { border-color:rgba(45,212,191,0.55); background:rgba(13,148,136,0.2); }
+.node.rank { border-color:rgba(251,191,36,0.55); background:rgba(180,83,9,0.18); }
+.node.ans  { border-color:rgba(94,234,212,0.6); background:rgba(13,148,136,0.26); }
+.arrow { color:#475569; font-size:30px; font-weight:800; flex:none; }
+.cap { font-size:19px; color:#94a3b8; text-align:center; }
+.cap b { color:#cbd5e1; }
+.by { position:absolute; bottom:26px; right:64px; font-size:15px; color:#64748b; }
+.by b { color:#94a3b8; }
+</style></head><body>
+<div class="s"><div class="grid"></div>
+<div class="wrap">
+  <div class="eyebrow"><span class="dot"></span> Retrieval Pipeline</div>
+  <h1>Hybrid Search + Re-ranking</h1>
+
+  <div class="flow">
+    <div class="node"><div class="ic">❓</div><div class="t">Question</div></div>
+    <span class="arrow">→</span>
+    <div class="branch">
+      <div class="node v"><div class="ic">🧭</div><div class="t">Vector search</div><div class="d">pgvector · HNSW</div></div>
+      <div class="node k"><div class="ic">🔤</div><div class="t">Keyword search</div><div class="d">Postgres FTS</div></div>
+    </div>
+    <span class="arrow">→</span>
+    <div class="node fuse"><div class="ic">⚗️</div><div class="t">RRF Fusion</div><div class="d">merge rankings</div></div>
+    <span class="arrow">→</span>
+    <div class="node rank"><div class="ic">🎯</div><div class="t">LLM Re-rank</div><div class="d">true relevance</div></div>
+    <span class="arrow">→</span>
+    <div class="node ans"><div class="ic">💬</div><div class="t">Answer</div><div class="d">grounded · cited</div></div>
+  </div>
+
+  <div class="cap"><b>Semantic + lexical retrieval</b>, fused with Reciprocal Rank Fusion, then <b>LLM-re-ranked</b> for precision.</div>
+</div>
+<div class="by"><b>rag-starter-fastapi</b> · Dhairya Senjaliya</div>
+</div></body></html>

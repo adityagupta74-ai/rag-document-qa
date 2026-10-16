@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RAG Starter — Ask your documents</title>
+<script defer src="/_vercel/insights/script.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0b1120; --panel: #0f172a; --card: #1e293b; --line: #243045;
+    --text: #e2e8f0; --muted: #94a3b8; --dim: #64748b;
+    --blue: #3b82f6; --cyan: #2dd4bf; --amber: #fcd34d;
+  }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(800px 500px at 90% -5%, rgba(6,182,212,0.10), transparent 60%),
+      radial-gradient(700px 600px at -5% 105%, rgba(59,130,246,0.12), transparent 55%),
+      var(--bg);
+    color: var(--text); height: 100vh; display: flex; flex-direction: column;
+  }
+  /* header */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px; border-bottom: 1px solid var(--line); flex: none;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { font-size: 22px; }
+  .brand h1 {
+    font-size: 18px; font-weight: 800; letter-spacing: -0.3px;
+    background: linear-gradient(90deg, #fff, #bae6fd 60%, #5eead4);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .brand .sub { font-size: 12.5px; color: var(--dim); margin-top: 1px; }
+  header a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--line); padding: 7px 13px; border-radius: 8px; }
+  header a:hover { color: var(--text); border-color: var(--cyan); }
+  header nav { display: flex; align-items: center; gap: 10px; }
+  header a.hire { color: var(--text); border-color: var(--cyan); }
+
+  /* layout */
+  .workspace { flex: 1; display: flex; min-height: 0; }
+
+  /* sidebar */
+  .sidebar { width: 312px; flex: none; border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; min-height: 0; background: rgba(15,23,42,0.4); }
+  .side-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+  .side-head .kbtitle { font-size: 14px; font-weight: 700; letter-spacing: 0.3px; color: #cbd5e1; }
+  .side-head .kbsub { font-size: 12px; color: var(--dim); margin-top: 3px; }
+  .doc-list { flex: 1; overflow-y: auto; padding: 14px; }
+  .doc-card { background: var(--card); border: 1px solid var(--line); border-radius: 11px;
+    padding: 12px 14px; margin-bottom: 10px; }
+  .doc-card .t { font-weight: 600; color: #e2e8f0; font-size: 14px; display: flex; align-items: center; gap: 7px; }
+  .doc-card .m { color: var(--dim); font-size: 12px; margin-top: 4px; }
+  .doc-card .badge { font-size: 11px; color: var(--cyan); background: rgba(45,212,191,0.1);
+    border: 1px solid rgba(45,212,191,0.25); border-radius: 999px; padding: 2px 8px; margin-left: auto; }
+  .doc-empty { color: var(--dim); font-size: 13px; text-align: center; padding: 20px 10px; line-height: 1.5; }
+  .side-foot { border-top: 1px solid var(--line); padding: 14px; }
+  .addbtn { width: 100%; background: var(--card); border: 1px solid var(--line); color: #cbd5e1;
+    border-radius: 9px; padding: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .addbtn:hover { border-color: var(--cyan); color: #fff; }
+  .addform { display: none; margin-top: 10px; }
+  .addform.open { display: block; }
+  .addform input, .addform textarea { width: 100%; background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 11px; color: var(--text); font-size: 13px; margin-bottom: 8px;
+    outline: none; font-family: inherit; }
+  .addform textarea { min-height: 90px; resize: vertical; }
+  .addform .save { width: 100%; background: var(--cyan); color: #06121f; font-weight: 700;
+    border: none; border-radius: 8px; padding: 9px; cursor: pointer; font-size: 13px; }
+
+  /* main / chat */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .chat { flex: 1; overflow-y: auto; padding: 26px; }
+  .chat-inner { max-width: 760px; margin: 0 auto; }
+
+  .welcome { text-align: center; padding: 48px 0 8px; }
+  .welcome h2 { font-size: 26px; font-weight: 800; margin-bottom: 10px; }
+  .welcome p { color: var(--muted); font-size: 15px; }
+
+  .msg { margin-bottom: 22px; }
+  .msg.user { text-align: right; }
+  .bubble { display: inline-block; text-align: left; padding: 12px 16px; border-radius: 14px;
+    max-width: 92%; line-height: 1.55; font-size: 15px; }
+  .msg.user .bubble { background: linear-gradient(135deg, var(--blue), #2563eb); color: #fff; }
+  .msg.bot .bubble { background: var(--card); border: 1px solid var(--line); }
+  .bubble .think { color: var(--dim); }
+  .err { color: #fca5a5; }
+  /* markdown inside answers */
+  .bubble strong { color: #fff; font-weight: 700; }
+  .bubble em { font-style: italic; }
+  .bubble a { color: var(--cyan); }
+  .bubble code { background: rgba(148,163,184,0.16); padding: 1px 6px; border-radius: 5px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; }
+  .bubble pre { background: var(--panel); border: 1px solid var(--line); border-radius: 9px;
+    padding: 11px 13px; overflow-x: auto; margin: 9px 0; }
+  .bubble pre code { background: none; padding: 0; font-size: 12.5px; line-height: 1.5; }
+  .bubble ul, .bubble ol { margin: 7px 0 7px 22px; }
+  .bubble li { margin: 3px 0; }
+  .bubble sup.cite { color: var(--cyan); font-weight: 700; font-size: 11px; }
+
+  .sources { margin-top: 12px; }
+  .sources summary { cursor: pointer; color: var(--cyan); font-size: 13px; font-weight: 600; list-style: none; }
+  .sources summary::-webkit-details-marker { display: none; }
+  .src { margin-top: 10px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; font-size: 13px; }
+  .src .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .src .title { color: #cbd5e1; font-weight: 600; }
+  .src .scorebadge { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    color: var(--cyan); background: rgba(45,212,191,0.12); border: 1px solid rgba(45,212,191,0.3); }
+  .src .snip { color: var(--dim); line-height: 1.5; }
+
+  /* suggested questions (persistent) */
+  .suggest { border-top: 1px solid var(--line); padding: 12px 26px 0; }
+  .suggest-inner { max-width: 760px; margin: 0 auto; }
+  .suggest .label { font-size: 11.5px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .chip { white-space: nowrap; font-size: 13px; color: #cbd5e1; background: var(--card);
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; cursor: pointer; flex: none; }
+  .chip:hover { border-color: var(--cyan); color: #fff; }
+
+  /* composer */
+  .composer-wrap { padding: 14px 26px 18px; flex: none; }
+  .composer { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; }
+  .composer input { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; color: var(--text); font-size: 15px; outline: none; }
+  .composer input:focus { border-color: var(--cyan); }
+  .composer button { background: linear-gradient(135deg, var(--cyan), var(--blue)); color: #06121f;
+    font-weight: 700; border: none; border-radius: 12px; padding: 0 22px; font-size: 15px; cursor: pointer; }
+  .composer button:disabled { opacity: 0.5; cursor: default; }
+
+  @media (max-width: 760px) { .sidebar { display: none; } }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo">🔎</span>
+      <div>
+        <h1>RAG Starter</h1>
+        <div class="sub">Hybrid search + re-ranking · grounded, cited answers</div>
+      </div>
+    </div>
+    <nav>
+      <a href="https://github.com/dhairyasenjaliya/rag-starter-fastapi" target="_blank">GitHub ↗</a>
+      <a class="hire" href="https://www.dhairyasenjaliya.com/" target="_blank" rel="noopener">Hire me ↗</a>
+    </nav>
+  </header>
+
+  <div class="workspace">
+    <!-- LEFT: knowledge base -->
+    <aside class="sidebar">
+      <div class="side-head">
+        <div class="kbtitle">📚 Knowledge Base</div>
+        <div class="kbsub" id="kbsub">Loading…</div>
+      </div>
+      <div class="doc-list" id="docList"></div>
+      <div class="side-foot">
+        <button class="addbtn" id="toggleAdd">＋ Add a document</button>
+        <div class="addform" id="addform">
+          <input id="docTitle" placeholder="Title (e.g. Refund Policy)" />
+          <textarea id="docContent" placeholder="Paste document text..."></textarea>
+          <button class="save" id="addBtn">Ingest document</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT: chat -->
+    <div class="main">
+      <div class="chat" id="chatScroll">
+        <div class="chat-inner" id="chat">
+          <div class="welcome" id="welcome">
+            <h2>Ask your documents anything</h2>
+            <p>Answers come only from the knowledge base on the left — with sources and relevance scores. Pick a question below to start.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="suggest">
+        <div class="suggest-inner">
+          <div class="label">Try asking</div>
+          <div class="chips" id="chips">
+            <span class="chip">How many PTO days do I get?</span>
+            <span class="chip">What is the refund policy?</span>
+            <span class="chip">What are the API rate limits?</span>
+            <span class="chip">When do engineers join on-call?</span>
+            <span class="chip">What's the laptop security policy?</span>
+            <span class="chip">How do I export my data?</span>
+            <span class="chip">What's the git workflow?</span>
+            <span class="chip">What's the home-office budget?</span>
+            <span class="chip">What plans does Acme Cloud offer?</span>
+            <span class="chip">How much parental leave is there?</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer-wrap">
+        <form class="composer" id="composer">
+          <input id="q" placeholder="Ask a question about your documents..." autocomplete="off" />
+          <button id="ask" type="submit">Ask</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+<script>
+const chat = document.getElementById('chat');
+const scroll = document.getElementById('chatScroll');
+const form = document.getElementById('composer');
+const input = document.getElementById('q');
+const askBtn = document.getElementById('ask');
+
+function escapeHtml(t) {
+  return (t || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function scrollDown() { scroll.scrollTop = scroll.scrollHeight; }
+
+// Minimal, dependency-free Markdown → HTML for model answers.
+// Input is HTML-escaped first, so only our generated tags are ever rendered.
+function inlineMd(s) {
+  return s
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+    .replace(/\[(\d+)\]/g, '<sup class="cite">[$1]</sup>');
+}
+function renderMarkdown(text) {
+  const blocks = [];
+  const body = escapeHtml(text || '').replace(/```([\s\S]*?)```/g, (_, code) => {
+    blocks.push(code.replace(/^\n/, ''));
+    return '\x01' + (blocks.length - 1) + '\x01';
+  });
+  let html = '', list = null;
+  const closeList = () => { if (list) { html += '</' + list + '>'; list = null; } };
+  for (const line of body.split('\n')) {
+    const ul = line.match(/^\s*[-*]\s+(.*)$/);
+    const ol = line.match(/^\s*\d+\.\s+(.*)$/);
+    if (ul) {
+      if (list !== 'ul') { closeList(); html += '<ul>'; list = 'ul'; }
+      html += '<li>' + inlineMd(ul[1]) + '</li>';
+    } else if (ol) {
+      if (list !== 'ol') { closeList(); html += '<ol>'; list = 'ol'; }
+      html += '<li>' + inlineMd(ol[1]) + '</li>';
+    } else if (line.trim() === '') {
+      closeList();
+    } else {
+      closeList();
+      html += inlineMd(line) + '<br>';
+    }
+  }
+  closeList();
+  return html
+    .replace(/(<br>)+$/, '')
+    .replace(/\x01(\d+)\x01/g, (_, i) => '<pre><code>' + blocks[i] + '</code></pre>');
+}
+
+function addMessage(role, html) {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+  const m = document.createElement('div');
+  m.className = 'msg ' + role;
+  m.innerHTML = '<div class="bubble">' + html + '</div>';
+  chat.appendChild(m);
+  scrollDown();
+  return m;
+}
+
+function renderSources(citations) {
+  if (!citations || !citations.length) return '';
+  let s = '<details class="sources" open><summary>📚 ' + citations.length + ' sources</summary>';
+  for (const c of citations) {
+    s += '<div class="src"><div class="top"><span class="title">' +
+      escapeHtml(c.document_title) + ' · chunk ' + c.chunk_index +
+      '</span><span class="scorebadge">score ' + c.score + '</span></div>' +
+      '<div class="snip">' + escapeHtml(c.snippet) + '</div></div>';
+  }
+  return s + '</details>';
+}
+
+const SEP = '\x1f';  // separates streamed answer text from the citations JSON
+
+async function ask(question) {
+  addMessage('user', escapeHtml(question));
+  const bot = addMessage('bot', '<span class="think">Searching & re-ranking…</span>');
+  const bubble = bot.querySelector('.bubble');
+  askBtn.disabled = true;
+  try {
+    const res = await fetch('/query/stream', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ question })
+    });
+    if (res.status === 429) {
+      bubble.innerHTML = '⏳ Rate limit reached — please wait a minute and try again.';
+      return;
+    }
+    if (!res.ok || !res.body) throw new Error('HTTP ' + res.status);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '', answer = '', citations = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const i = buf.indexOf(SEP);
+      if (i === -1) {
+        answer = buf;
+      } else {
+        answer = buf.slice(0, i);
+        try { citations = JSON.parse(buf.slice(i + 1)).citations; } catch (_) { /* frame still arriving */ }
+      }
+      bubble.innerHTML =
+        (answer ? renderMarkdown(answer) : '<span class="think">Searching & re-ranking…</span>') +
+        (citations ? renderSources(citations) : '');
+      scrollDown();
+    }
+    bubble.innerHTML = renderMarkdown(answer) + renderSources(citations || []);
+  } catch (e) {
+    bubble.innerHTML =
+      '<span class="err">⚠️ ' + escapeHtml(e.message) + '. Is the knowledge base populated and the API key set?</span>';
+  } finally {
+    askBtn.disabled = false; scrollDown();
+  }
+}
+
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  ask(q);
+});
+document.getElementById('chips').addEventListener('click', e => {
+  if (e.target.classList.contains('chip')) ask(e.target.textContent);
+});
+
+// Knowledge base sidebar
+async function loadDocuments() {
+  const list = document.getElementById('docList');
+  const sub = document.getElementById('kbsub');
+  try {
+    const res = await fetch('/documents');
+    if (!res.ok) throw new Error();
+    const docs = await res.json();
+    if (!docs.length) {
+      sub.textContent = 'No documents yet';
+      list.innerHTML = '<div class="doc-empty">Nothing ingested yet.<br>Add a document below to start asking.</div>';
+      return;
+    }
+    const totalChunks = docs.reduce((n, d) => n + d.chunks, 0);
+    sub.textContent = docs.length + ' documents · ' + totalChunks + ' chunks';
+    list.innerHTML = docs.map(d =>
+      '<div class="doc-card"><div class="t">📄 ' + escapeHtml(d.title) +
+      '<span class="badge">' + d.chunks + '</span></div>' +
+      (d.source ? '<div class="m">' + escapeHtml(d.source) + '</div>' : '') + '</div>'
+    ).join('');
+  } catch (e) {
+    sub.textContent = 'Could not load';
+    list.innerHTML = '<div class="doc-empty">Knowledge base unavailable.</div>';
+  }
+}
+
+// Add document
+const addform = document.getElementById('addform');
+document.getElementById('toggleAdd').addEventListener('click', () => addform.classList.toggle('open'));
+document.getElementById('addBtn').addEventListener('click', async () => {
+  const title = document.getElementById('docTitle').value.trim();
+  const content = document.getElementById('docContent').value.trim();
+  if (!title || !content) return;
+  const btn = document.getElementById('addBtn');
+  btn.textContent = 'Ingesting…'; btn.disabled = true;
+  try {
+    const res = await fetch('/documents', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ title, content })
+    });
+    if (res.status === 429) throw new Error('Rate limit — wait a minute');
+    if (!res.ok) throw new Error('server error');
+    const data = await res.json();
+    addMessage('bot', '✅ Ingested <b>' + escapeHtml(title) + '</b> (' + data.chunks_created + ' chunks). Ask away!');
+    document.getElementById('docTitle').value = '';
+    document.getElementById('docContent').value = '';
+    addform.classList.remove('open');
+    loadDocuments();
+  } catch (e) {
+    addMessage('bot', '<span class="err">⚠️ Could not add document (' + escapeHtml(e.message) + ').</span>');
+  } finally {
+    btn.textContent = 'Ingest document'; btn.disabled = false;
+  }
+});
+
+loadDocuments();
+</script>
+</body>
+</html>
