@@ -370,6 +370,49 @@ state of `main`.
 
 ---
 
+## Deploy on AWS (EC2 + Docker Compose)
+
+The app and its database run as two containers on a single EC2 instance.
+
+![App running on AWS EC2](.github/rag-aws-demo.png)
+
+**1. Launch the instance** (Ubuntu 24.04, `t3.small`, 20 GiB gp3). In the security group allow only:
+
+- SSH (22) from your IP
+- TCP 8000 from your IP (the app)
+
+Do not open 5432. The database port is bound to `127.0.0.1` in `docker-compose.yml`.
+
+**2. Install Docker** using the [official apt repository](https://docs.docker.com/engine/install/ubuntu/), then let your user run it without sudo (`sudo usermod -aG docker ubuntu`, log in again).
+
+**3. Get the code and configure it**
+
+```bash
+git clone https://github.com/adityagupta74-ai/rag-document-qa.git
+cd rag-document-qa
+cp .env.example .env && chmod 600 .env
+```
+
+Edit `.env`: set `OPENAI_API_KEY` (and the provider settings if you are not using OpenAI), and set `POSTGRES_PASSWORD` and `ADMIN_API_KEY` to long random values (for example `openssl rand -hex 16`).
+
+**4. Start it**
+
+```bash
+docker compose --profile app up -d --build
+curl -s http://localhost:8000/health          # {"status":"ok"}
+docker compose exec api python -m scripts.ingest_examples
+```
+
+Then open `http://<instance-public-ip>:8000`.
+
+Notes:
+
+- Containers use `restart: unless-stopped`, so they come back after the instance restarts. The public IP changes on every stop/start.
+- Traffic is plain HTTP. For anything public, put it behind a load balancer or reverse proxy with a TLS certificate, and add authentication to the upload endpoint.
+- Stop the instance when it is idle to avoid compute charges. The disk (and your data) is kept.
+
+---
+
 ## What I changed
 
 This project started from the MIT-licensed
@@ -382,6 +425,7 @@ Dhairya Senjaliya. My changes on top of it:
 - **Heading-aware Markdown chunking** — chunks start at section boundaries; oversized sections are split with their heading repeated on each piece.
 - **`DELETE /documents/{id}`** endpoint with optional `X-API-Key` protection and offline tests.
 - **Evaluation harness** — added paraphrased questions, a hybrid-without-rerank variant, an embedding cache, throttling for free-tier rate limits, and a guard that refuses to report re-ranking results if the re-ranker fell back to retrieval order.
+- **Deployment** — a Docker Compose `api` service (opt-in profile), a database port bound to localhost, a `.dockerignore`, and a tested EC2 deployment guide.
 - **Tests** — 18 new offline tests (32 total), all run in CI.
 
 ### Evaluation
